@@ -22,7 +22,7 @@ namespace BTKSASelfPortrait
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
         public const string Version = "1.0.0";
-        public const string DownloadLink = "";
+        public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
     public class BTKSASelfPortrait : MelonMod
@@ -47,6 +47,14 @@ namespace BTKSASelfPortrait
         public override void VRChat_OnUiManagerInit()
         {
             MelonLogger.Log("BTK Standalone: Self Portrait - Starting Up");
+
+            if (Directory.Exists("BTKCompanion"))
+            {
+                MelonLogger.Log("Woah, hold on a sec, it seems you might be running BTKCompanion, if this is true BTKSASelfPortrait is built into that, and you should not be using this!");
+                MelonLogger.Log("If you are not currently using BTKCompanion please remove the BTKCompanion folder from your VRChat installation!");
+                MelonLogger.LogError("BTKSASelfPortrait has not started up! (BTKCompanion Exists)");
+                return;
+            }
 
             MelonPrefs.RegisterCategory(settingsCategory, "BTKSA Self Portrait");
             MelonPrefs.RegisterFloat(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
