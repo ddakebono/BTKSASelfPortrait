@@ -13,6 +13,7 @@ using Harmony;
 using VRC.SDKBase;
 using VRC;
 using UnityEngine.UI;
+using UnityEngine.Rendering.PostProcessing;
 
 namespace BTKSASelfPortrait
 {
@@ -21,7 +22,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.0.1";
+        public const string Version = "1.0.2";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -139,6 +140,10 @@ namespace BTKSASelfPortrait
 
                 uiRawImage.color = new Color(1, 1, 1, MelonPrefs.GetInt(settingsCategory, prefsUIAlpha) / 100f);
                 cameraComp.clearFlags = CameraClearFlags.SolidColor;
+
+                //Remove PostProcessLayers
+                foreach (PostProcessLayer layer in cameraGO.GetComponents<PostProcessLayer>())
+                    GameObject.Destroy(layer);
 
                 Log("Applied Adjustments", true);
             }
