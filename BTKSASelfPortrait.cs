@@ -21,16 +21,21 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
     public class BTKSASelfPortrait : MelonMod
     {
+        public static BTKSASelfPortrait instance;
+
+        public HarmonyInstance harmony;
+
         private GameObject cameraEye;
         private GameObject hudContent;
         private GameObject cameraGO;
         private GameObject uiRTGO;
+        private Camera cameraComp;
         private RawImage uiRawImage;
 
         private bool showSelfPortrait;
@@ -56,11 +61,20 @@ namespace BTKSASelfPortrait
                 return;
             }
 
+            instance = this;
+
+            harmony = HarmonyInstance.Create("BTKStandaloneSP");
+
+            
+
             MelonPrefs.RegisterCategory(settingsCategory, "BTKSA Self Portrait");
             MelonPrefs.RegisterFloat(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
             MelonPrefs.RegisterInt(settingsCategory, prefsUIAlpha, 70, "UI Display Alpha Percentage");
 
             ExpansionKitApi.RegisterSimpleMenuButton(ExpandedMenu.QuickMenu, "Toggle Self Portrait", toggleSelfPortrait);
+
+            //Using FadeTo hook to determine when world is pretty much loaded
+            harmony.Patch(typeof(VRCUiBackgroundFade).GetMethod("Method_Public_Void_Single_Action_0", BindingFlags.Instance | BindingFlags.Public), null, new HarmonyMethod(typeof(BTKSASelfPortrait).GetMethod("OnFade", BindingFlags.Public | BindingFlags.Static)));
 
             loadAssets();
 
@@ -71,6 +85,12 @@ namespace BTKSASelfPortrait
         public override void OnModSettingsApplied()
         {
             applySPCameraAdjustments();
+        }
+
+        public static void OnFade()
+        {
+            //Make sure all settings are applied on fade
+            BTKSASelfPortrait.instance.applySPCameraAdjustments();
         }
 
         public void toggleSelfPortrait()
@@ -84,6 +104,7 @@ namespace BTKSASelfPortrait
                     uiRTGO = GameObject.Instantiate(uiPrefab, hudContent.transform);
 
                     uiRawImage = uiRTGO.GetComponent<RawImage>();
+                    cameraComp = cameraGO.GetComponent<Camera>();
 
                     hasInstantiatedPrefabs = true;
                 }
@@ -108,13 +129,19 @@ namespace BTKSASelfPortrait
 
         public void applySPCameraAdjustments()
         {
-            cameraGO.transform.localPosition = new Vector3(0, 0, MelonPrefs.GetFloat(settingsCategory, prefsCameraDistance));
-            cameraGO.transform.localRotation = new Quaternion(0, 180, 0, 0);
+            if (hasInstantiatedPrefabs)
+            {
+                cameraGO.transform.localPosition = new Vector3(0, 0, MelonPrefs.GetFloat(settingsCategory, prefsCameraDistance));
+                cameraGO.transform.localRotation = new Quaternion(0, 180, 0, 0);
 
-            uiRTGO.transform.localPosition = new Vector3(300, -250, 0);
-            uiRTGO.transform.localScale = new Vector3(0.4f, 0.47f, 0.4f);
+                uiRTGO.transform.localPosition = new Vector3(300, -250, 0);
+                uiRTGO.transform.localScale = new Vector3(0.4f, 0.47f, 0.4f);
 
-            uiRawImage.color = new Color(1, 1, 1, MelonPrefs.GetInt(settingsCategory, prefsUIAlpha)/100f);
+                uiRawImage.color = new Color(1, 1, 1, MelonPrefs.GetInt(settingsCategory, prefsUIAlpha) / 100f);
+                cameraComp.clearFlags = CameraClearFlags.SolidColor;
+
+                Log("Applied Adjustments", true);
+            }
         }
 
         private void loadAssets()
