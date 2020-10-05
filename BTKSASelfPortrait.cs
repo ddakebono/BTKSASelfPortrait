@@ -22,7 +22,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.0.2";
+        public const string Version = "1.0.3";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -65,8 +65,6 @@ namespace BTKSASelfPortrait
             instance = this;
 
             harmony = HarmonyInstance.Create("BTKStandaloneSP");
-
-            
 
             MelonPrefs.RegisterCategory(settingsCategory, "BTKSA Self Portrait");
             MelonPrefs.RegisterFloat(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
@@ -140,6 +138,10 @@ namespace BTKSASelfPortrait
 
                 uiRawImage.color = new Color(1, 1, 1, MelonPrefs.GetInt(settingsCategory, prefsUIAlpha) / 100f);
                 cameraComp.clearFlags = CameraClearFlags.SolidColor;
+
+                //Ensure camera colour doesn't get set to an alpha above 0
+                Color bgColour = new Color(0, 0, 0, 0);
+                cameraComp.backgroundColor = bgColour;
 
                 //Remove PostProcessLayers
                 foreach (PostProcessLayer layer in cameraGO.GetComponents<PostProcessLayer>())
