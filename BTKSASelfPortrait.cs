@@ -22,7 +22,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.0.3";
+        public const string Version = "1.1.0";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -48,17 +48,19 @@ namespace BTKSASelfPortrait
         private string settingsCategory = "BTKSASelfPortrait";
         private string prefsCameraDistance = "CameraDistance";
         private string prefsUIAlpha = "UIAlpha";
+        private string prefsUIFlip = "UIFlip";
+        private string prefsReflectOtherPlayers = "ReflectOthers";
+        private string prefsFarClippingDist = "FarClippingDist";
 
 
         public override void VRChat_OnUiManagerInit()
         {
             MelonLogger.Log("BTK Standalone: Self Portrait - Starting Up");
 
-            if (Directory.Exists("BTKCompanion"))
+            if (MelonHandler.Mods.Any(x => x.Info.Name.Equals("BTKCompanionLoader", StringComparison.OrdinalIgnoreCase)))
             {
-                MelonLogger.Log("Woah, hold on a sec, it seems you might be running BTKCompanion, if this is true BTKSASelfPortrait is built into that, and you should not be using this!");
-                MelonLogger.Log("If you are not currently using BTKCompanion please remove the BTKCompanion folder from your VRChat installation!");
-                MelonLogger.LogError("BTKSASelfPortrait has not started up! (BTKCompanion Exists)");
+                MelonLogger.Log("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
+                MelonLogger.LogError("BTKSASelfPortrait has not started up! (BTKCompanion Running)");
                 return;
             }
 
@@ -69,6 +71,9 @@ namespace BTKSASelfPortrait
             MelonPrefs.RegisterCategory(settingsCategory, "BTKSA Self Portrait");
             MelonPrefs.RegisterFloat(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
             MelonPrefs.RegisterInt(settingsCategory, prefsUIAlpha, 70, "UI Display Alpha Percentage");
+            MelonPrefs.RegisterBool(settingsCategory, prefsUIFlip, true, "Flip Display (Matches mirrors)");
+            MelonPrefs.RegisterBool(settingsCategory, prefsReflectOtherPlayers, false, "Reflect Other Players");
+            MelonPrefs.RegisterFloat(settingsCategory, prefsFarClippingDist, 5f, "Camera Cutoff Distance");
 
             ExpansionKitApi.RegisterSimpleMenuButton(ExpandedMenu.QuickMenu, "Toggle Self Portrait", toggleSelfPortrait);
 
@@ -137,11 +142,22 @@ namespace BTKSASelfPortrait
                 uiRTGO.transform.localScale = new Vector3(0.4f, 0.47f, 0.4f);
 
                 uiRawImage.color = new Color(1, 1, 1, MelonPrefs.GetInt(settingsCategory, prefsUIAlpha) / 100f);
-                cameraComp.clearFlags = CameraClearFlags.SolidColor;
+                if (MelonPrefs.GetBool(settingsCategory, prefsUIFlip))
+                    uiRawImage.rectTransform.localEulerAngles = new Vector3(0, -180f, 0);
+                else
+                    uiRawImage.rectTransform.localEulerAngles = new Vector3(0, 0, 0);
 
                 //Ensure camera colour doesn't get set to an alpha above 0
                 Color bgColour = new Color(0, 0, 0, 0);
                 cameraComp.backgroundColor = bgColour;
+                cameraComp.clearFlags = CameraClearFlags.SolidColor;
+                cameraComp.farClipPlane = MelonPrefs.GetFloat(settingsCategory, prefsFarClippingDist);
+                if (MelonPrefs.GetBool(settingsCategory, prefsReflectOtherPlayers))
+                    //Reflect other players
+                    cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("Player");
+                else
+                    //Don't reflect other players
+                    cameraComp.cullingMask &= ~(1 << LayerMask.NameToLayer("Player"));
 
                 //Remove PostProcessLayers
                 foreach (PostProcessLayer layer in cameraGO.GetComponents<PostProcessLayer>())
