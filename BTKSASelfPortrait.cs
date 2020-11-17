@@ -22,7 +22,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.1.0";
+        public const string Version = "1.1.1";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -78,7 +78,15 @@ namespace BTKSASelfPortrait
             ExpansionKitApi.RegisterSimpleMenuButton(ExpandedMenu.QuickMenu, "Toggle Self Portrait", toggleSelfPortrait);
 
             //Using FadeTo hook to determine when world is pretty much loaded
-            harmony.Patch(typeof(VRCUiBackgroundFade).GetMethod("Method_Public_Void_Single_Action_0", BindingFlags.Instance | BindingFlags.Public), null, new HarmonyMethod(typeof(BTKSASelfPortrait).GetMethod("OnFade", BindingFlags.Public | BindingFlags.Static)));
+            //Hooking FadeTo for world join late event
+            foreach (MethodInfo method in typeof(VRCUiBackgroundFade).GetMethods(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (method.Name.Contains("Method_Public_Void_Single_Action") && !method.Name.Contains("PDM"))
+                {
+                    Log($"Found target fadeTo method, patching! ({method.Name})", true);
+                    harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSASelfPortrait).GetMethod("OnFade", BindingFlags.Static | BindingFlags.Public)));
+                }
+            }
 
             loadAssets();
 
