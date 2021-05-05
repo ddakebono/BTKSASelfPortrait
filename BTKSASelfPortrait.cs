@@ -1,17 +1,12 @@
 ﻿using MelonLoader;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Reflection;
 using UIExpansionKit.API;
 using UnhollowerRuntimeLib;
 using UnityEngine;
 using System.IO;
 using Harmony;
-using VRC.SDKBase;
-using VRC;
 using UnityEngine.UI;
 using UnityEngine.Rendering.PostProcessing;
 
@@ -51,16 +46,26 @@ namespace BTKSASelfPortrait
         private string prefsUIFlip = "UIFlip";
         private string prefsReflectOtherPlayers = "ReflectOthers";
         private string prefsFarClippingDist = "FarClippingDist";
+        int scenesLoaded = 0;
 
-
-        public override void VRChat_OnUiManagerInit()
+        public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
-            MelonLogger.Log("BTK Standalone: Self Portrait - Starting Up");
+            if (scenesLoaded <= 2)
+            {
+                scenesLoaded++;
+                if (scenesLoaded == 2)
+                    UiManagerInit();
+            }
+        }
+
+        public void UiManagerInit()
+        {
+            MelonLogger.Msg("BTK Standalone: Self Portrait - Starting Up");
 
             if (MelonHandler.Mods.Any(x => x.Info.Name.Equals("BTKCompanionLoader", StringComparison.OrdinalIgnoreCase)))
             {
-                MelonLogger.Log("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
-                MelonLogger.LogError("BTKSASelfPortrait has not started up! (BTKCompanion Running)");
+                MelonLogger.Msg("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
+                MelonLogger.Error("BTKSASelfPortrait has not started up! (BTKCompanion Running)");
                 return;
             }
 
@@ -68,14 +73,14 @@ namespace BTKSASelfPortrait
 
             harmony = HarmonyInstance.Create("BTKStandaloneSP");
 
-            MelonPrefs.RegisterCategory(settingsCategory, "BTKSA Self Portrait");
-            MelonPrefs.RegisterFloat(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
-            MelonPrefs.RegisterInt(settingsCategory, prefsUIAlpha, 70, "UI Display Alpha Percentage");
-            MelonPrefs.RegisterBool(settingsCategory, prefsUIFlip, true, "Flip Display (Matches mirrors)");
-            MelonPrefs.RegisterBool(settingsCategory, prefsReflectOtherPlayers, false, "Reflect Other Players");
-            MelonPrefs.RegisterFloat(settingsCategory, prefsFarClippingDist, 5f, "Camera Cutoff Distance");
+            MelonPreferences.CreateCategory(settingsCategory, "BTKSA Self Portrait");
+            MelonPreferences.CreateEntry<float>(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
+            MelonPreferences.CreateEntry<int>(settingsCategory, prefsUIAlpha, 70, "UI Display Alpha Percentage");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, prefsUIFlip, true, "Flip Display (Matches mirrors)");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, prefsReflectOtherPlayers, false, "Reflect Other Players");
+            MelonPreferences.CreateEntry<float>(settingsCategory, prefsFarClippingDist, 5f, "Camera Cutoff Distance");
 
-            ExpansionKitApi.RegisterSimpleMenuButton(ExpandedMenu.QuickMenu, "Toggle Self Portrait", toggleSelfPortrait);
+            ExpansionKitApi.GetExpandedMenu(ExpandedMenu.QuickMenu).AddSimpleButton("Toggle Self Portrait", toggleSelfPortrait);
 
             //Using FadeTo hook to determine when world is pretty much loaded
             //Hooking FadeTo for world join late event
@@ -94,7 +99,7 @@ namespace BTKSASelfPortrait
             hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent");
         }
 
-        public override void OnModSettingsApplied()
+        public override void OnPreferencesSaved()
         {
             applySPCameraAdjustments();
         }
@@ -143,14 +148,14 @@ namespace BTKSASelfPortrait
         {
             if (hasInstantiatedPrefabs)
             {
-                cameraGO.transform.localPosition = new Vector3(0, 0, MelonPrefs.GetFloat(settingsCategory, prefsCameraDistance));
+                cameraGO.transform.localPosition = new Vector3(0, 0, MelonPreferences.GetEntryValue<float>(settingsCategory, prefsCameraDistance));
                 cameraGO.transform.localRotation = new Quaternion(0, 180, 0, 0);
 
                 uiRTGO.transform.localPosition = new Vector3(300, -250, 0);
                 uiRTGO.transform.localScale = new Vector3(0.4f, 0.47f, 0.4f);
 
-                uiRawImage.color = new Color(1, 1, 1, MelonPrefs.GetInt(settingsCategory, prefsUIAlpha) / 100f);
-                if (MelonPrefs.GetBool(settingsCategory, prefsUIFlip))
+                uiRawImage.color = new Color(1, 1, 1, MelonPreferences.GetEntryValue<int>(settingsCategory, prefsUIAlpha) / 100f);
+                if (MelonPreferences.GetEntryValue<bool>(settingsCategory, prefsUIFlip))
                     uiRawImage.rectTransform.localEulerAngles = new Vector3(0, -180f, 0);
                 else
                     uiRawImage.rectTransform.localEulerAngles = new Vector3(0, 0, 0);
@@ -159,8 +164,8 @@ namespace BTKSASelfPortrait
                 Color bgColour = new Color(0, 0, 0, 0);
                 cameraComp.backgroundColor = bgColour;
                 cameraComp.clearFlags = CameraClearFlags.SolidColor;
-                cameraComp.farClipPlane = MelonPrefs.GetFloat(settingsCategory, prefsFarClippingDist);
-                if (MelonPrefs.GetBool(settingsCategory, prefsReflectOtherPlayers))
+                cameraComp.farClipPlane = MelonPreferences.GetEntryValue<float>(settingsCategory, prefsFarClippingDist);
+                if (MelonPreferences.GetEntryValue<bool>(settingsCategory, prefsReflectOtherPlayers))
                     //Reflect other players
                     cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("Player");
                 else
@@ -203,10 +208,10 @@ namespace BTKSASelfPortrait
 
         public static void Log(string log, bool dbg = false)
         {
-            if (!Imports.IsDebugMode() && dbg)
+            if (!MelonDebug.IsEnabled() && dbg)
                 return;
 
-            MelonLogger.Log(log);
+            MelonLogger.Msg(log);
         }
     }
 }
