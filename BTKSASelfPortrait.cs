@@ -1,12 +1,13 @@
 ﻿using MelonLoader;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UIExpansionKit.API;
 using UnhollowerRuntimeLib;
 using UnityEngine;
 using System.IO;
-using Harmony;
+using HarmonyLib;
 using UnityEngine.UI;
 using UnityEngine.Rendering.PostProcessing;
 
@@ -17,15 +18,13 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.1.2";
+        public const string Version = "1.1.3";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
     public class BTKSASelfPortrait : MelonMod
     {
         public static BTKSASelfPortrait instance;
-
-        public HarmonyInstance harmony;
 
         private GameObject cameraEye;
         private GameObject hudContent;
@@ -71,8 +70,6 @@ namespace BTKSASelfPortrait
 
             instance = this;
 
-            harmony = HarmonyInstance.Create("BTKStandaloneSP");
-
             MelonPreferences.CreateCategory(settingsCategory, "BTKSA Self Portrait");
             MelonPreferences.CreateEntry<float>(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
             MelonPreferences.CreateEntry<int>(settingsCategory, prefsUIAlpha, 70, "UI Display Alpha Percentage");
@@ -81,33 +78,32 @@ namespace BTKSASelfPortrait
             MelonPreferences.CreateEntry<float>(settingsCategory, prefsFarClippingDist, 5f, "Camera Cutoff Distance");
 
             ExpansionKitApi.GetExpandedMenu(ExpandedMenu.QuickMenu).AddSimpleButton("Toggle Self Portrait", toggleSelfPortrait);
-
-            //Using FadeTo hook to determine when world is pretty much loaded
-            //Hooking FadeTo for world join late event
-            foreach (MethodInfo method in typeof(VRCUiBackgroundFade).GetMethods(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (method.Name.Contains("Method_Public_Void_Single_Action") && !method.Name.Contains("PDM"))
-                {
-                    Log($"Found target fadeTo method, patching! ({method.Name})", true);
-                    harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSASelfPortrait).GetMethod("OnFade", BindingFlags.Static | BindingFlags.Public)));
-                }
-            }
+            
+            //Apply patches
+            applyPatches(typeof(FadePatches));
 
             loadAssets();
 
             cameraEye = GameObject.Find("Camera (eye)");
             hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent");
         }
+        
+        private void applyPatches(Type type)
+        {
+            try
+            {
+                HarmonyLib.Harmony.CreateAndPatchAll(type, "BTKHarmonyInstance");
+            }
+            catch(Exception e)
+            {
+                MelonLogger.Error($"Failed while patching {type.Name}!");
+                MelonLogger.Error(e);
+            }
+        }
 
         public override void OnPreferencesSaved()
         {
             applySPCameraAdjustments();
-        }
-
-        public static void OnFade()
-        {
-            //Make sure all settings are applied on fade
-            BTKSASelfPortrait.instance.applySPCameraAdjustments();
         }
 
         public void toggleSelfPortrait()
@@ -212,6 +208,21 @@ namespace BTKSASelfPortrait
                 return;
 
             MelonLogger.Msg(log);
+        }
+    }
+    
+    [HarmonyPatch]
+    class FadePatches 
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            return typeof(VRCUiBackgroundFade).GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => x.Name.Contains("Method_Public_Void_Single_Action") && !x.Name.Contains("PDM")).Cast<MethodBase>();
+        }
+
+        static void Postfix()
+        {
+            //Make sure all settings are applied on fade
+            BTKSASelfPortrait.instance.applySPCameraAdjustments();
         }
     }
 }
