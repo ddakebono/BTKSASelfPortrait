@@ -10,6 +10,7 @@ using System.IO;
 using HarmonyLib;
 using UnityEngine.UI;
 using UnityEngine.Rendering.PostProcessing;
+using Object = UnityEngine.Object;
 
 namespace BTKSASelfPortrait
 {
@@ -18,41 +19,50 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.1.3";
+        public const string Version = "1.2.0";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
     public class BTKSASelfPortrait : MelonMod
     {
-        public static BTKSASelfPortrait instance;
+        public static BTKSASelfPortrait Instance;
 
-        private GameObject cameraEye;
-        private GameObject hudContent;
-        private GameObject cameraGO;
-        private GameObject uiRTGO;
-        private Camera cameraComp;
-        private RawImage uiRawImage;
+        private GameObject _cameraEye;
+        private GameObject _hudContent;
+        private GameObject _cameraGO;
+        private GameObject _uiRtgo;
+        private Camera _cameraComp;
+        private RawImage _uiRawImage;
 
-        private bool showSelfPortrait;
-        private bool hasInstantiatedPrefabs;
-        private AssetBundle spBundle;
-        private GameObject cameraPrefab;
-        private GameObject uiPrefab;
+        private bool _showSelfPortrait;
+        private bool _hasInstantiatedPrefabs;
+        private AssetBundle _spBundle;
+        private GameObject _cameraPrefab;
+        private GameObject _uiPrefab;
 
-        private string settingsCategory = "BTKSASelfPortrait";
-        private string prefsCameraDistance = "CameraDistance";
-        private string prefsUIAlpha = "UIAlpha";
-        private string prefsUIFlip = "UIFlip";
-        private string prefsReflectOtherPlayers = "ReflectOthers";
-        private string prefsFarClippingDist = "FarClippingDist";
-        int scenesLoaded = 0;
+        private const string SettingsCategory = "BTKSASelfPortrait";
+        private const string PrefsCameraDistance = "CameraDistance";
+        private const string PrefsUIAlpha = "UIAlpha";
+        private const string PrefsUIFlip = "UIFlip";
+        private const string PrefsReflectOtherPlayers = "ReflectOthers";
+        private const string PrefsFarClippingDist = "FarClippingDist";
+        private const string PrefsPosX = "UIPosX";
+        private const string PrefsPosY = "UIPosY";
+        private const string PrefsScaleX = "UIScaleX";
+        private const string PrefsScaleY = "UIScaleY";
+        int _scenesLoaded = 0;
+        
+        //Local prefs
+        private float _cameraDistance, _farClippingDist, _uiPosX, _uiPosY, _uiScaleX, _uiScaleY;
+        private int _uiAlpha;
+        private bool _uiFlip, _reflectOtherPlayers;
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
-            if (scenesLoaded <= 2)
+            if (_scenesLoaded <= 2)
             {
-                scenesLoaded++;
-                if (scenesLoaded == 2)
+                _scenesLoaded++;
+                if (_scenesLoaded == 2)
                     UiManagerInit();
             }
         }
@@ -68,24 +78,28 @@ namespace BTKSASelfPortrait
                 return;
             }
 
-            instance = this;
+            Instance = this;
 
-            MelonPreferences.CreateCategory(settingsCategory, "BTKSA Self Portrait");
-            MelonPreferences.CreateEntry<float>(settingsCategory, prefsCameraDistance, 0.7f, "Camera Distance");
-            MelonPreferences.CreateEntry<int>(settingsCategory, prefsUIAlpha, 70, "UI Display Alpha Percentage");
-            MelonPreferences.CreateEntry<bool>(settingsCategory, prefsUIFlip, true, "Flip Display (Matches mirrors)");
-            MelonPreferences.CreateEntry<bool>(settingsCategory, prefsReflectOtherPlayers, false, "Reflect Other Players");
-            MelonPreferences.CreateEntry<float>(settingsCategory, prefsFarClippingDist, 5f, "Camera Cutoff Distance");
+            MelonPreferences.CreateCategory(SettingsCategory, "BTKSA Self Portrait");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsCameraDistance, 0.7f, "Camera Distance");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsUIAlpha, 70, "UI Display Alpha Percentage");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsUIFlip, true, "Flip Display (Matches mirrors)");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsReflectOtherPlayers, false, "Reflect Other Players");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsFarClippingDist, 5f, "Camera Cutoff Distance");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsPosX, 300f, "UI Position X");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsPosY, -250f, "UI Position Y");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsScaleX, 0.4f, "UI Scale X");
+            MelonPreferences.CreateEntry(SettingsCategory, PrefsScaleY, 0.47f, "UI Scale Y");
 
-            ExpansionKitApi.GetExpandedMenu(ExpandedMenu.QuickMenu).AddSimpleButton("Toggle Self Portrait", toggleSelfPortrait);
+            ExpansionKitApi.GetExpandedMenu(ExpandedMenu.QuickMenu).AddSimpleButton("Toggle Self Portrait", ToggleSelfPortrait);
             
             //Apply patches
             applyPatches(typeof(FadePatches));
 
-            loadAssets();
+            LoadAssets();
 
-            cameraEye = GameObject.Find("Camera (eye)");
-            hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent");
+            _cameraEye = GameObject.Find("Camera (eye)");
+            _hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent");
         }
         
         private void applyPatches(Type type)
@@ -103,80 +117,90 @@ namespace BTKSASelfPortrait
 
         public override void OnPreferencesSaved()
         {
-            applySPCameraAdjustments();
+            _cameraDistance = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsCameraDistance);
+            _farClippingDist = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsFarClippingDist);
+            _uiPosX = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsPosX);
+            _uiPosY = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsPosY);
+            _uiScaleX = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsScaleX);
+            _uiScaleY = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsScaleY);
+            _uiAlpha = MelonPreferences.GetEntryValue<int>(SettingsCategory, PrefsUIAlpha);
+            _uiFlip = MelonPreferences.GetEntryValue<bool>(SettingsCategory, PrefsUIFlip);
+            _reflectOtherPlayers = MelonPreferences.GetEntryValue<bool>(SettingsCategory, PrefsReflectOtherPlayers);
+            
+            ApplySpCameraAdjustments();
         }
 
-        public void toggleSelfPortrait()
+        public void ToggleSelfPortrait()
         {
-            if (!showSelfPortrait)
+            if (!_showSelfPortrait)
             {
-                if(!hasInstantiatedPrefabs)
+                if(!_hasInstantiatedPrefabs)
                 {
                     //Instantiate target prefabs
-                    cameraGO = GameObject.Instantiate(cameraPrefab, cameraEye.transform);
-                    uiRTGO = GameObject.Instantiate(uiPrefab, hudContent.transform);
+                    _cameraGO = Object.Instantiate(_cameraPrefab, _cameraEye.transform);
+                    _uiRtgo = Object.Instantiate(_uiPrefab, _hudContent.transform);
 
-                    uiRawImage = uiRTGO.GetComponent<RawImage>();
-                    cameraComp = cameraGO.GetComponent<Camera>();
+                    _uiRawImage = _uiRtgo.GetComponent<RawImage>();
+                    _cameraComp = _cameraGO.GetComponent<Camera>();
 
-                    hasInstantiatedPrefabs = true;
+                    _hasInstantiatedPrefabs = true;
                 }
 
-                cameraGO.SetActive(true);
-                uiRTGO.SetActive(true);
+                _cameraGO.SetActive(true);
+                _uiRtgo.SetActive(true);
 
-                applySPCameraAdjustments();
-                showSelfPortrait = true;
+                ApplySpCameraAdjustments();
+                _showSelfPortrait = true;
             }
             else
             {
-                if (hasInstantiatedPrefabs)
+                if (_hasInstantiatedPrefabs)
                 {
-                    cameraGO.SetActive(false);
-                    uiRTGO.SetActive(false);
+                    _cameraGO.SetActive(false);
+                    _uiRtgo.SetActive(false);
                 }
 
-                showSelfPortrait = false;
+                _showSelfPortrait = false;
             }
         }
 
-        public void applySPCameraAdjustments()
+        public void ApplySpCameraAdjustments()
         {
-            if (hasInstantiatedPrefabs)
+            if (_hasInstantiatedPrefabs)
             {
-                cameraGO.transform.localPosition = new Vector3(0, 0, MelonPreferences.GetEntryValue<float>(settingsCategory, prefsCameraDistance));
-                cameraGO.transform.localRotation = new Quaternion(0, 180, 0, 0);
+                _cameraGO.transform.localPosition = new Vector3(0, 0, _cameraDistance);
+                _cameraGO.transform.localRotation = new Quaternion(0, 180, 0, 0);
 
-                uiRTGO.transform.localPosition = new Vector3(300, -250, 0);
-                uiRTGO.transform.localScale = new Vector3(0.4f, 0.47f, 0.4f);
+                _uiRtgo.transform.localPosition = new Vector3(_uiPosX, _uiPosY, 0);
+                _uiRtgo.transform.localScale = new Vector3(_uiScaleX, _uiScaleY, _uiScaleX);
 
-                uiRawImage.color = new Color(1, 1, 1, MelonPreferences.GetEntryValue<int>(settingsCategory, prefsUIAlpha) / 100f);
-                if (MelonPreferences.GetEntryValue<bool>(settingsCategory, prefsUIFlip))
-                    uiRawImage.rectTransform.localEulerAngles = new Vector3(0, -180f, 0);
+                _uiRawImage.color = new Color(1, 1, 1, _uiAlpha / 100f);
+                if (_uiFlip)
+                    _uiRawImage.rectTransform.localEulerAngles = new Vector3(0, -180f, 0);
                 else
-                    uiRawImage.rectTransform.localEulerAngles = new Vector3(0, 0, 0);
+                    _uiRawImage.rectTransform.localEulerAngles = new Vector3(0, 0, 0);
 
                 //Ensure camera colour doesn't get set to an alpha above 0
                 Color bgColour = new Color(0, 0, 0, 0);
-                cameraComp.backgroundColor = bgColour;
-                cameraComp.clearFlags = CameraClearFlags.SolidColor;
-                cameraComp.farClipPlane = MelonPreferences.GetEntryValue<float>(settingsCategory, prefsFarClippingDist);
-                if (MelonPreferences.GetEntryValue<bool>(settingsCategory, prefsReflectOtherPlayers))
+                _cameraComp.backgroundColor = bgColour;
+                _cameraComp.clearFlags = CameraClearFlags.SolidColor;
+                _cameraComp.farClipPlane = _farClippingDist;
+                if (_reflectOtherPlayers)
                     //Reflect other players
-                    cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("Player");
+                    _cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("Player");
                 else
                     //Don't reflect other players
-                    cameraComp.cullingMask &= ~(1 << LayerMask.NameToLayer("Player"));
+                    _cameraComp.cullingMask &= ~(1 << LayerMask.NameToLayer("Player"));
 
                 //Remove PostProcessLayers
-                foreach (PostProcessLayer layer in cameraGO.GetComponents<PostProcessLayer>())
-                    GameObject.Destroy(layer);
+                foreach (PostProcessLayer layer in _cameraGO.GetComponents<PostProcessLayer>())
+                    Object.Destroy(layer);
 
                 Log("Applied Adjustments", true);
             }
         }
 
-        private void loadAssets()
+        private void LoadAssets()
         {
             using (var assetStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSASelfPortrait.spasset"))
             {
@@ -185,17 +209,17 @@ namespace BTKSASelfPortrait
                 {
                     assetStream.CopyTo(tempStream);
 
-                    spBundle = AssetBundle.LoadFromMemory_Internal(tempStream.ToArray(), 0);
-                    spBundle.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                    _spBundle = AssetBundle.LoadFromMemory_Internal(tempStream.ToArray(), 0);
+                    _spBundle.hideFlags |= HideFlags.DontUnloadUnusedAsset;
                 }
             }
 
-            if (spBundle != null)
+            if (_spBundle != null)
             {
-                cameraPrefab = spBundle.LoadAsset_Internal("SPCamera", Il2CppType.Of<GameObject>()).Cast<GameObject>();
-                cameraPrefab.hideFlags |= HideFlags.DontUnloadUnusedAsset;
-                uiPrefab = spBundle.LoadAsset_Internal("RTOutput", Il2CppType.Of<GameObject>()).Cast<GameObject>();
-                uiPrefab.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                _cameraPrefab = _spBundle.LoadAsset_Internal("SPCamera", Il2CppType.Of<GameObject>()).Cast<GameObject>();
+                _cameraPrefab.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                _uiPrefab = _spBundle.LoadAsset_Internal("RTOutput", Il2CppType.Of<GameObject>()).Cast<GameObject>();
+                _uiPrefab.hideFlags |= HideFlags.DontUnloadUnusedAsset;
             }
 
             Log("Loaded Assets Successfully!", true);
@@ -222,7 +246,7 @@ namespace BTKSASelfPortrait
         static void Postfix()
         {
             //Make sure all settings are applied on fade
-            BTKSASelfPortrait.instance.applySPCameraAdjustments();
+            BTKSASelfPortrait.Instance.ApplySpCameraAdjustments();
         }
     }
 }
