@@ -99,7 +99,10 @@ namespace BTKSASelfPortrait
             LoadAssets();
 
             _cameraEye = GameObject.Find("Camera (eye)");
-            _hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent");
+            _hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent_Old");
+            //Check for potential fuckery
+            if(_hudContent == null || _hudContent.transform.GetChild(0).name != "Hud")
+                _hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent");
             
             OnPreferencesSaved();
         }
