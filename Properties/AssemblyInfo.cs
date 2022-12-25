@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using MelonLoader;
@@ -11,7 +12,7 @@ using MelonLoader;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("BTK-Development")]
 [assembly: AssemblyProduct("BTKSASelfPortrait")]
-[assembly: AssemblyCopyright("Copyright ©  2020")]
+[assembly: AssemblyCopyright("Copyright ©  2022")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -33,8 +34,10 @@ using MelonLoader;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.2.2.0")]
-[assembly: AssemblyFileVersion("1.2.2.0")]
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
 [assembly: MelonInfo(typeof(BTKSASelfPortrait.BTKSASelfPortrait), BTKSASelfPortrait.BuildInfo.Name, BTKSASelfPortrait.BuildInfo.Version, BTKSASelfPortrait.BuildInfo.Author, BTKSASelfPortrait.BuildInfo.DownloadLink)]
-[assembly: MelonGame("VRChat", "VRChat")]
+[assembly: MelonGame("Alpha Blend Interactive", "ChilloutVR")]
+[assembly: MelonColor(ConsoleColor.DarkMagenta)]
+[assembly: MelonAuthorColor(ConsoleColor.DarkMagenta)]
 [assembly: HarmonyDontPatchAll]

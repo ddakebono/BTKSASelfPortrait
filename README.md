@@ -1,9 +1,9 @@
-# BTKSASelfPortrait
+# BTKSASelfPortrait For ChilloutVR
 BTK Standalone: Self Portrait is a small mod that adds a toggleable face camera to the Hud.
 
-This mod requires [UIExpansionKit](https://github.com/knah/VRCMods) or it will not work at all.
+This mod requires [BTKUILib](https://github.com/BTK-Development/BTKUILib) or it will not work at all.
 
-There's a couple settings in the UIExpansionKit mod settings menu.
+There's a couple settings in the BTK Settings menu that can be found in the QuickMenu!
 
 1. Camera Distance - This setting allows you to fine tune how far away the face camera is from you.
 2. UI Display Alpha Percentage - This setting allows you to set the level of transparency of the HUD element.
@@ -18,14 +18,13 @@ There's a couple settings in the UIExpansionKit mod settings menu.
 If you encounter issues with this mod, feel free to contact me on Discord (DDAkebono#0001)!
 
 ## Install/Usage
-Install [MelonLoader](https://github.com/HerpDerpinstine/MelonLoader) version 0.4.0.0 or higher, this is required as the mod has been updated specifically for 0.4.0.0!
+Install [MelonLoader](https://github.com/HerpDerpinstine/MelonLoader) version 0.5.7 or higher, this is required as the mod has been updated specifically for 0.5.7!
 
-Download the latest release from [Releases](https://github.com/ddakebono/BTKSASelfPortrait/releases) and place in your VRChat\Mods folder.
+Download the latest release from [Releases](https://github.com/ddakebono/BTKSASelfPortrait/releases) and place in your ChilloutVR/Mods folder!
 
 ## Disclamer
-**Warning:** The VRChat team is not very keen on modding or reverse engineering the game, while the mod does not include anything that would ruin the fun for others, using it may still be a bannable offence.
-
-**USE IT AT YOUR OWN RISK**, I am not responsible for any bans or any punishments you may get by using this mod!
+### BTKUILib is not made by or affiliated with Alpha Blend Interactive
 
 ## Credits
 * [HerpDerpinstine/MelonLoader](https://github.com/HerpDerpinstine/MelonLoader)
+* [ChilloutVR](https://store.steampowered.com/app/661130/ChilloutVR/)

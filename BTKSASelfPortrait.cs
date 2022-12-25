@@ -3,11 +3,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using UIExpansionKit.API;
-using UnhollowerRuntimeLib;
 using UnityEngine;
 using System.IO;
+using ABI_RC.Core.InteractionSystem;
+using ABI_RC.Core.Networking;
+using ABI_RC.Core.Player;
+using ABI_RC.Core.Savior;
+using BTKSASelfPortrait.Config;
+using BTKUILib;
+using BTKUILib.UIObjects;
+using BTKUILib.UIObjects.Components;
+using BTKUILib.UIObjects.Objects;
 using HarmonyLib;
+using Semver;
 using UnityEngine.UI;
 using UnityEngine.Rendering.PostProcessing;
 using Object = UnityEngine.Object;
@@ -19,13 +27,16 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "1.2.2";
+        public const string Version = "2.0.0";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
     public class BTKSASelfPortrait : MelonMod
     {
         public static BTKSASelfPortrait Instance;
+        internal static MelonLogger.Instance Logger;
+
+        internal static readonly List<BTKBaseConfig> BTKConfigs = new(); 
 
         private GameObject _cameraEye;
         private GameObject _hudContent;
@@ -34,110 +45,149 @@ namespace BTKSASelfPortrait
         private Camera _cameraComp;
         private RawImage _uiRawImage;
 
-        private bool _showSelfPortrait;
         private bool _hasInstantiatedPrefabs;
+        private bool _lastVRCheck;
+        private bool _ranInitalize;
         private AssetBundle _spBundle;
         private GameObject _cameraPrefab;
         private GameObject _uiPrefab;
 
-        private const string SettingsCategory = "BTKSASelfPortrait";
-        private const string PrefsCameraDistance = "CameraDistance";
-        private const string PrefsUIAlpha = "UIAlpha";
-        private const string PrefsUIFlip = "UIFlip";
-        private const string PrefsReflectOtherPlayers = "ReflectOthers";
-        private const string PrefsFarClippingDist = "FarClippingDist";
-        private const string PrefsPosX = "UIPosX";
-        private const string PrefsPosY = "UIPosY";
-        private const string PrefsScaleX = "UIScaleX";
-        private const string PrefsScaleY = "UIScaleY";
-        int _scenesLoaded = 0;
-        
-        //Local prefs
-        private float _cameraDistance, _farClippingDist, _uiPosX, _uiPosY, _uiScaleX, _uiScaleY;
-        private int _uiAlpha;
-        private bool _uiFlip, _reflectOtherPlayers;
+        private readonly BTKFloatConfig _cameraDistance = new(nameof(BTKSASelfPortrait), "Camera Distance", "Sets how far the camera is from your view point", 0.5021816f, 0f, 10f, null, false);
+        private readonly BTKFloatConfig _alphaPercentage = new(nameof(BTKSASelfPortrait), "Alpha Percentage", "Sets how transparent the Self Portrait is", .8f, 0f, 1f, null, false);
+        private readonly BTKBoolConfig _flipDisplay = new(nameof(BTKSASelfPortrait), "Flip Display", "Flips the display of Self Portrait like a mirror", true, null, false);
+        private readonly BTKBoolConfig _reflectOtherPlayers = new(nameof(BTKSASelfPortrait), "Reflect Other Players", "Sets if other players can be seen in Self Portrait", true, null, false);
+        private readonly BTKFloatConfig _farClippingDistance = new(nameof(BTKSASelfPortrait), "Far Clipping Distance", "Sets how far objects will be visible in the camera", 5f, 0f, 30f, null, false);
+        private readonly BTKFloatConfig _positionX = new(nameof(BTKSASelfPortrait), "Position X", "Sets the X position on your HUD for Self Portrait", 500.0f, -400f, 1000f, null, false);
+        private readonly BTKFloatConfig _positionY = new(nameof(BTKSASelfPortrait), "Position Y", "Sets the Y position on your HUD for Self Portrait", -350.0f, -400f, 400f, null, false);
+        private readonly BTKFloatConfig _scaleX = new(nameof(BTKSASelfPortrait), "Scale X", "Sets the X scale of Self Portrait on the HUD", .2f, 0f, 1f, null, false);
+        private readonly BTKFloatConfig _scaleY = new(nameof(BTKSASelfPortrait), "Scale Y", "Sets the Y scale of Self Portrait on the HUD", 0.3f, 0f, 1f, null, false);
 
-        public override void OnSceneWasLoaded(int buildIndex, string sceneName)
+        public override void OnInitializeMelon()
         {
-            if (_scenesLoaded <= 2)
+            Logger = LoggerInstance;
+            
+            Logger.Msg("BTK Standalone: Self Portrait - Starting Up");
+
+            if (RegisteredMelons.Any(x => x.Info.Name.Equals("BTKCompanionLoader", StringComparison.OrdinalIgnoreCase)))
             {
-                _scenesLoaded++;
-                if (_scenesLoaded == 2)
-                    UiManagerInit();
+                Logger.Msg("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
+                Logger.Error("BTKSASelfPortrait has not started up! (BTKCompanion Running)");
+                return;
             }
-        }
-
-        public void UiManagerInit()
-        {
-            MelonLogger.Msg("BTK Standalone: Self Portrait - Starting Up");
-
-            if (MelonHandler.Mods.Any(x => x.Info.Name.Equals("BTKCompanionLoader", StringComparison.OrdinalIgnoreCase)))
+            
+            if (!RegisteredMelons.Any(x => x.Info.Name.Equals("BTKUILib") && x.Info.SemanticVersion != null && x.Info.SemanticVersion.CompareTo(new SemVersion(0, 3)) >= 0))
             {
-                MelonLogger.Msg("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
-                MelonLogger.Error("BTKSASelfPortrait has not started up! (BTKCompanion Running)");
+                Logger.Error("BTKUILib was not detected or it outdated! BTKCompanion cannot function without it!");
+                Logger.Error("Please download an updated copy for BTKUILib!");
                 return;
             }
 
             Instance = this;
-
-            MelonPreferences.CreateCategory(SettingsCategory, "BTKSA Self Portrait");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsCameraDistance, 0.7f, "Camera Distance");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsUIAlpha, 70, "UI Display Alpha Percentage");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsUIFlip, true, "Flip Display (Matches mirrors)");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsReflectOtherPlayers, false, "Reflect Other Players");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsFarClippingDist, 5f, "Camera Cutoff Distance");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsPosX, 300f, "UI Position X");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsPosY, -250f, "UI Position Y");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsScaleX, 0.4f, "UI Scale X");
-            MelonPreferences.CreateEntry(SettingsCategory, PrefsScaleY, 0.47f, "UI Scale Y");
-
-            ExpansionKitApi.GetExpandedMenu(ExpandedMenu.QuickMenu).AddSimpleButton("Toggle Self Portrait", ToggleSelfPortrait);
             
+            _positionX.OnConfigUpdated += o =>
+            {
+                if (_uiRtgo == null) return;
+                var pos = _uiRtgo.transform.localPosition;
+                pos.x = _positionX.FloatValue;
+                _uiRtgo.transform.localPosition = pos;
+            };
+
+            _positionY.OnConfigUpdated += o =>
+            {
+                if (_uiRtgo == null) return;
+                var pos = _uiRtgo.transform.localPosition;
+                pos.y = _positionY.FloatValue;
+                _uiRtgo.transform.localPosition = pos;
+            };
+
+            _scaleX.OnConfigUpdated += o =>
+            {
+                if (_uiRtgo == null) return;
+                var scale = _uiRtgo.transform.localScale;
+                scale.x = _scaleX.FloatValue;
+                _uiRtgo.transform.localScale = scale;
+            };
+
+            _scaleY.OnConfigUpdated += o =>
+            {
+                if (_uiRtgo == null) return;
+                var scale = _uiRtgo.transform.localScale;
+                scale.y = _scaleY.FloatValue;
+                _uiRtgo.transform.localScale = scale;
+            };
+
+            _alphaPercentage.OnConfigUpdated += o =>
+            {
+                if(_uiRawImage != null)
+                    _uiRawImage.color = new Color(1, 1, 1, _alphaPercentage.FloatValue);
+            };
+
+            _cameraDistance.OnConfigUpdated += f =>
+            {
+                if (_cameraGO == null) return;
+                _cameraGO.transform.localPosition = new Vector3(0, 0, _cameraDistance.FloatValue);
+            };
+
+            _farClippingDistance.OnConfigUpdated += f =>
+            {
+                if (_cameraComp == null) return;
+                _cameraComp.farClipPlane = _farClippingDistance.FloatValue;
+            };
+
+            _flipDisplay.OnConfigUpdated += b =>
+            {
+                if(_uiRawImage == null) return;
+                _uiRawImage.rectTransform.localEulerAngles = _flipDisplay.BoolValue ? new Vector3(0, -180f, 0) : new Vector3(0, 0, 0);
+            };
+
+            _reflectOtherPlayers.OnConfigUpdated += b =>
+            {
+                if (_cameraComp == null) return;
+                
+                if (_reflectOtherPlayers.BoolValue)
+                    //Reflect other players
+                    _cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("PlayerNetwork");
+                else
+                    //Don't reflect other players
+                    _cameraComp.cullingMask &= ~(1 << LayerMask.NameToLayer("PlayerNetwork"));
+            };
+
             //Apply patches
-            applyPatches(typeof(FadePatches));
+            ApplyPatches(typeof(RichPresensePatch));
 
             LoadAssets();
 
-            _cameraEye = GameObject.Find("Camera (eye)");
-            _hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent_Old");
-            //Check for potential fuckery
-            if(_hudContent == null || _hudContent.transform.GetChild(0).name != "Hud")
-                _hudContent = GameObject.Find("/UserInterface/UnscaledUI/HudContent");
-            
-            OnPreferencesSaved();
-        }
-        
-        private void applyPatches(Type type)
-        {
-            try
-            {
-                HarmonyLib.Harmony.CreateAndPatchAll(type, "BTKHarmonyInstance");
-            }
-            catch(Exception e)
-            {
-                MelonLogger.Error($"Failed while patching {type.Name}!");
-                MelonLogger.Error(e);
-            }
+            QuickMenuAPI.OnMenuRegenerate += LateStartup;
         }
 
-        public override void OnPreferencesSaved()
+        private void LateStartup(CVR_MenuManager unused)
         {
-            _cameraDistance = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsCameraDistance);
-            _farClippingDist = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsFarClippingDist);
-            _uiPosX = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsPosX);
-            _uiPosY = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsPosY);
-            _uiScaleX = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsScaleX);
-            _uiScaleY = MelonPreferences.GetEntryValue<float>(SettingsCategory, PrefsScaleY);
-            _uiAlpha = MelonPreferences.GetEntryValue<int>(SettingsCategory, PrefsUIAlpha);
-            _uiFlip = MelonPreferences.GetEntryValue<bool>(SettingsCategory, PrefsUIFlip);
-            _reflectOtherPlayers = MelonPreferences.GetEntryValue<bool>(SettingsCategory, PrefsReflectOtherPlayers);
+            if (_ranInitalize) return;
+
+            _ranInitalize = true;
             
-            ApplySpCameraAdjustments();
+            RichPresensePatch.OnWorldJoin += ApplySPCameraAdjustments;
+            
+            GetHudElements();
+            
+            SetupUI();
         }
 
-        public void ToggleSelfPortrait()
+        public void ToggleSelfPortrait(bool state)
         {
-            if (!_showSelfPortrait)
+            if (_lastVRCheck != MetaPort.Instance.isUsingVr)
+            {
+                //Time to move things!
+                GetHudElements();
+                
+                if (_cameraGO != null && _uiRtgo != null)
+                {
+                    _cameraGO.transform.parent = _cameraEye.transform;
+                    _uiRtgo.transform.parent = _hudContent.transform;
+                }
+            }
+            
+            if (state)
             {
                 if(!_hasInstantiatedPrefabs)
                 {
@@ -145,7 +195,7 @@ namespace BTKSASelfPortrait
                     _cameraGO = Object.Instantiate(_cameraPrefab, _cameraEye.transform);
                     _uiRtgo = Object.Instantiate(_uiPrefab, _hudContent.transform);
 
-                    _uiRawImage = _uiRtgo.GetComponent<RawImage>();
+                    _uiRawImage = _uiRtgo.GetComponentInChildren<RawImage>();
                     _cameraComp = _cameraGO.GetComponent<Camera>();
 
                     _hasInstantiatedPrefabs = true;
@@ -154,8 +204,7 @@ namespace BTKSASelfPortrait
                 _cameraGO.SetActive(true);
                 _uiRtgo.SetActive(true);
 
-                ApplySpCameraAdjustments();
-                _showSelfPortrait = true;
+                ApplySPCameraAdjustments(null);
             }
             else
             {
@@ -164,44 +213,40 @@ namespace BTKSASelfPortrait
                     _cameraGO.SetActive(false);
                     _uiRtgo.SetActive(false);
                 }
-
-                _showSelfPortrait = false;
             }
         }
 
-        public void ApplySpCameraAdjustments()
+        public void ApplySPCameraAdjustments(RichPresenceInstance_t richPresenceInstanceT)
         {
             if (_hasInstantiatedPrefabs)
             {
-                _cameraGO.transform.localPosition = new Vector3(0, 0, _cameraDistance);
+                //Ensure the camera is pointing correctly as set it's distance from the viewpoint
+                _cameraGO.transform.localPosition = new Vector3(0, 0, _cameraDistance.FloatValue);
                 _cameraGO.transform.localRotation = new Quaternion(0, 180, 0, 0);
 
-                _uiRtgo.transform.localPosition = new Vector3(_uiPosX, _uiPosY, 0);
-                _uiRtgo.transform.localScale = new Vector3(_uiScaleX, _uiScaleY, _uiScaleX);
+                //Ensure the UI element is in the right spot
+                _uiRtgo.transform.localPosition = new Vector3(_positionX.FloatValue, _positionY.FloatValue, 0);
+                _uiRtgo.transform.localScale = new Vector3(_scaleX.FloatValue, _scaleY.FloatValue, _scaleX.FloatValue);
 
-                _uiRawImage.color = new Color(1, 1, 1, _uiAlpha / 100f);
-                if (_uiFlip)
-                    _uiRawImage.rectTransform.localEulerAngles = new Vector3(0, -180f, 0);
-                else
-                    _uiRawImage.rectTransform.localEulerAngles = new Vector3(0, 0, 0);
+                //Set RawImage colour and rotation
+                _uiRawImage.color = new Color(1, 1, 1, _alphaPercentage.FloatValue);
+                _uiRawImage.rectTransform.localEulerAngles = _flipDisplay.BoolValue ? new Vector3(0, -180f, 0) : new Vector3(0, 0, 0);
 
-                //Ensure camera colour doesn't get set to an alpha above 0
+                //Ensure camera colour doesn't get set to an alpha above 0, also set camera settings
                 Color bgColour = new Color(0, 0, 0, 0);
                 _cameraComp.backgroundColor = bgColour;
                 _cameraComp.clearFlags = CameraClearFlags.SolidColor;
-                _cameraComp.farClipPlane = _farClippingDist;
-                if (_reflectOtherPlayers)
+                _cameraComp.farClipPlane = _farClippingDistance.FloatValue;
+                if (_reflectOtherPlayers.BoolValue)
                     //Reflect other players
-                    _cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("Player");
+                    _cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("PlayerNetwork");
                 else
                     //Don't reflect other players
-                    _cameraComp.cullingMask &= ~(1 << LayerMask.NameToLayer("Player"));
+                    _cameraComp.cullingMask &= ~(1 << LayerMask.NameToLayer("PlayerNetwork"));
 
                 //Remove PostProcessLayers
                 foreach (PostProcessLayer layer in _cameraGO.GetComponents<PostProcessLayer>())
                     Object.Destroy(layer);
-
-                Log("Applied Adjustments", true);
             }
         }
 
@@ -209,49 +254,165 @@ namespace BTKSASelfPortrait
         {
             using (var assetStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSASelfPortrait.spasset"))
             {
-                Log("Loaded Embedded resource", true);
-                using (var tempStream = new MemoryStream((int)assetStream.Length))
+                if (assetStream != null)
                 {
+                    using var tempStream = new MemoryStream((int) assetStream.Length);
                     assetStream.CopyTo(tempStream);
 
-                    _spBundle = AssetBundle.LoadFromMemory_Internal(tempStream.ToArray(), 0);
+                    _spBundle = AssetBundle.LoadFromMemory(tempStream.ToArray(), 0);
                     _spBundle.hideFlags |= HideFlags.DontUnloadUnusedAsset;
                 }
             }
 
             if (_spBundle != null)
             {
-                _cameraPrefab = _spBundle.LoadAsset_Internal("SPCamera", Il2CppType.Of<GameObject>()).Cast<GameObject>();
+                _cameraPrefab = _spBundle.LoadAsset<GameObject>("SPCamera");
                 _cameraPrefab.hideFlags |= HideFlags.DontUnloadUnusedAsset;
-                _uiPrefab = _spBundle.LoadAsset_Internal("RTOutput", Il2CppType.Of<GameObject>()).Cast<GameObject>();
+                _uiPrefab = _spBundle.LoadAsset<GameObject>("RTOutput");
                 _uiPrefab.hideFlags |= HideFlags.DontUnloadUnusedAsset;
             }
 
-            Log("Loaded Assets Successfully!", true);
+            Logger.Msg("SelfPortrait assets have been loaded!");
 
         }
-
-        public static void Log(string log, bool dbg = false)
+        
+        private void ApplyPatches(Type type)
         {
-            if (!MelonDebug.IsEnabled() && dbg)
-                return;
+            try
+            {
+                HarmonyInstance.PatchAll(type);
+            }
+            catch(Exception e)
+            {
+                Logger.Error($"Failed while patching {type.Name}!");
+                Logger.Error(e);
+            }
+        }
 
-            MelonLogger.Msg(log);
+        private void GetHudElements()
+        {
+            if (!MetaPort.Instance.isUsingVr)
+            {
+                _cameraEye = PlayerSetup.Instance.desktopCamera;
+                _hudContent = PlayerSetup.Instance.desktopCamera.GetComponentInChildren<Canvas>().gameObject;
+                _lastVRCheck = false;
+            }
+            else
+            {
+                _cameraEye = PlayerSetup.Instance.vrCamera;
+                _hudContent = PlayerSetup.Instance.vrCamera.GetComponentInChildren<Canvas>().gameObject;
+                _lastVRCheck = true;
+            }
+        }
+
+        private void SetupUI()
+        {
+            QuickMenuAPI.PrepareIcon("BTKStandalone", "BTKIcon", Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSASelfPortrait.Images.BTKIcon.png"));
+            QuickMenuAPI.PrepareIcon("BTKStandalone", "Settings", Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSASelfPortrait.Images.Settings.png"));
+
+            var rootPage = new Page("BTKStandalone", "MainPage", true, "BTKIcon");
+            rootPage.MenuTitle = "BTK Standalone Mods";
+            rootPage.MenuSubtitle = "Toggle and configure your BTK Standalone mods here!";
+
+            var functionToggles = rootPage.AddCategory("Self Portrait");
+
+            var toggleSP = functionToggles.AddToggle("Self Portrait", "Toggles on self portrait", false);
+            toggleSP.OnValueUpdated += b =>
+            {
+                ToggleSelfPortrait(b);
+            };
+            
+            var settingsPage = functionToggles.AddPage("SP Settings", "Settings", "Change settings related to SelfPortrait", "BTKStandalone");
+
+            var configCategories = new Dictionary<string, Category>();
+            
+            foreach (var config in BTKConfigs)
+            {
+                if (!configCategories.ContainsKey(config.Category)) 
+                    configCategories.Add(config.Category, settingsPage.AddCategory(config.Category));
+
+                var cat = configCategories[config.Category];
+
+                switch (config.Type)
+                {
+                    case { } boolType when boolType == typeof(bool):
+                        ToggleButton toggle = null;
+                        var boolConfig = (BTKBoolConfig)config;
+                        toggle = cat.AddToggle(config.Name, config.Description, boolConfig.BoolValue);
+                        toggle.OnValueUpdated += b =>
+                        {
+                            if (!ConfigDialogs(config))
+                                toggle.ToggleValue = boolConfig.BoolValue;
+
+                            boolConfig.BoolValue = b;
+                        };
+                        break;
+                    case {} floatType when floatType == typeof(float):
+                        SliderFloat slider = null;
+                        var floatConfig = (BTKFloatConfig)config;
+                        slider = settingsPage.AddSlider(floatConfig.Name, floatConfig.Description, Convert.ToSingle(floatConfig.FloatValue), floatConfig.MinValue, floatConfig.MaxValue);
+                        slider.OnValueUpdated += f =>
+                        {
+                            if (!ConfigDialogs(config))
+                            {
+                                slider.SetSliderValue(floatConfig.FloatValue);
+                                return;
+                            }
+
+                            floatConfig.FloatValue = f;
+
+                        };
+                        break;
+                }
+            }
+        }
+        
+        private bool ConfigDialogs(BTKBaseConfig config)
+        {
+            if (config.DialogMessage != null)
+            {
+                QuickMenuAPI.ShowNotice("Notice", config.DialogMessage);
+            }
+
+            return true;
         }
     }
-    
-    [HarmonyPatch]
-    class FadePatches 
-    {
-        static IEnumerable<MethodBase> TargetMethods()
-        {
-            return typeof(VRCUiBackgroundFade).GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => x.Name.Contains("Method_Public_Void_Single_Action") && !x.Name.Contains("PDM")).Cast<MethodBase>();
-        }
 
-        static void Postfix()
+    [HarmonyPatch(typeof(RichPresence))]
+    class RichPresensePatch
+    {
+        public static Action<RichPresenceInstance_t> OnWorldJoin;
+        
+        private static string _lastRichPresenseUpdate;
+        private static FieldInfo _richPresenceLastMsgGetter = typeof(RichPresence).GetField("LastMsg", BindingFlags.Static | BindingFlags.NonPublic);
+        
+        [HarmonyPatch(nameof(RichPresence.DisplayMode), MethodType.Setter)]
+        [HarmonyPrefix]
+        static bool OnRichPresenseUpdated()
         {
-            //Make sure all settings are applied on fade
-            BTKSASelfPortrait.Instance.ApplySpCameraAdjustments();
+            var rpInfo = GetRichPresenceInfo();
+
+            if (rpInfo == null) return true;
+            
+            if (_lastRichPresenseUpdate == rpInfo.InstanceMeshId) return true;
+            
+            _lastRichPresenseUpdate = rpInfo.InstanceMeshId;
+
+            try
+            {
+                OnWorldJoin?.Invoke(rpInfo);
+            }
+            catch (Exception e)
+            {
+                BTKSASelfPortrait.Logger.Error(e);
+            }
+
+            return true;
+        }
+        
+        private static RichPresenceInstance_t GetRichPresenceInfo()
+        {
+            return _richPresenceLastMsgGetter.GetValue(null) as RichPresenceInstance_t;
         }
     }
 }
