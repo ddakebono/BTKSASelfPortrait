@@ -27,7 +27,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "2.0.0";
+        public const string Version = "2.0.1";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -56,6 +56,7 @@ namespace BTKSASelfPortrait
         private readonly BTKFloatConfig _alphaPercentage = new(nameof(BTKSASelfPortrait), "Alpha Percentage", "Sets how transparent the Self Portrait is", .8f, 0f, 1f, null, false);
         private readonly BTKBoolConfig _flipDisplay = new(nameof(BTKSASelfPortrait), "Flip Display", "Flips the display of Self Portrait like a mirror", true, null, false);
         private readonly BTKBoolConfig _reflectOtherPlayers = new(nameof(BTKSASelfPortrait), "Reflect Other Players", "Sets if other players can be seen in Self Portrait", true, null, false);
+        private readonly BTKBoolConfig _enableAtStart = new(nameof(BTKSASelfPortrait), "Enable At Start", "Sets Self Portrait to be enabled automatically", false, null, false);
         private readonly BTKFloatConfig _farClippingDistance = new(nameof(BTKSASelfPortrait), "Far Clipping Distance", "Sets how far objects will be visible in the camera", 5f, 0f, 30f, null, false);
         private readonly BTKFloatConfig _positionX = new(nameof(BTKSASelfPortrait), "Position X", "Sets the X position on your HUD for Self Portrait", 500.0f, -400f, 1000f, null, false);
         private readonly BTKFloatConfig _positionY = new(nameof(BTKSASelfPortrait), "Position Y", "Sets the Y position on your HUD for Self Portrait", -350.0f, -400f, 400f, null, false);
@@ -171,6 +172,9 @@ namespace BTKSASelfPortrait
             GetHudElements();
             
             SetupUI();
+            
+            if(_enableAtStart.BoolValue)
+                ToggleSelfPortrait(true);
         }
 
         public void ToggleSelfPortrait(bool state)
