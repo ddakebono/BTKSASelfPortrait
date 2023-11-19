@@ -27,7 +27,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "2.0.1";
+        public const string Version = "2.0.2";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -63,6 +63,8 @@ namespace BTKSASelfPortrait
         private readonly BTKFloatConfig _scaleX = new(nameof(BTKSASelfPortrait), "Scale X", "Sets the X scale of Self Portrait on the HUD", .2f, 0f, 1f, null, false);
         private readonly BTKFloatConfig _scaleY = new(nameof(BTKSASelfPortrait), "Scale Y", "Sets the Y scale of Self Portrait on the HUD", 0.3f, 0f, 1f, null, false);
 
+        private static MethodInfo _btkGetCreatePageAdapter;
+
         public override void OnInitializeMelon()
         {
             Logger = LoggerInstance;
@@ -84,6 +86,13 @@ namespace BTKSASelfPortrait
             }
 
             Instance = this;
+
+            if (RegisteredMelons.Any(x => x.Info.Name.Equals("BTKUILib") && x.Info.SemanticVersion.CompareTo(new SemVersion(2, 0, 0)) <= 0))
+            {
+                //We're working with UILib 2.0.0, let's reflect the get create page function
+                _btkGetCreatePageAdapter = typeof(Page).GetMethod("GetOrCreatePage", BindingFlags.Public | BindingFlags.Static);
+                Logger.Msg($"BTKUILib 2.0.0 detected, attempting to grab GetOrCreatePage function: {_btkGetCreatePageAdapter != null}");
+            }
             
             _positionX.OnConfigUpdated += o =>
             {
@@ -314,13 +323,19 @@ namespace BTKSASelfPortrait
             QuickMenuAPI.PrepareIcon("BTKStandalone", "BTKIcon", Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSASelfPortrait.Images.BTKIcon.png"));
             QuickMenuAPI.PrepareIcon("BTKStandalone", "Settings", Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSASelfPortrait.Images.Settings.png"));
 
-            var rootPage = new Page("BTKStandalone", "MainPage", true, "BTKIcon");
+            Page rootPage;
+
+            if (_btkGetCreatePageAdapter != null)
+                rootPage = (Page)_btkGetCreatePageAdapter.Invoke(null, new object[] { "BTKStandalone", "MainPage", true, "BTKIcon", null, false });
+            else
+                rootPage = new Page("BTKStandalone", "MainPage", true, "BTKIcon");
+
             rootPage.MenuTitle = "BTK Standalone Mods";
             rootPage.MenuSubtitle = "Toggle and configure your BTK Standalone mods here!";
 
             var functionToggles = rootPage.AddCategory("Self Portrait");
 
-            var toggleSP = functionToggles.AddToggle("Self Portrait", "Toggles on self portrait", false);
+            var toggleSP = functionToggles.AddToggle("Self Portrait", "Toggles on self portrait", _enableAtStart.BoolValue);
             toggleSP.OnValueUpdated += b =>
             {
                 ToggleSelfPortrait(b);
