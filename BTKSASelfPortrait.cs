@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using System.IO;
+using ABI_RC.Core;
 using ABI_RC.Core.InteractionSystem;
 using ABI_RC.Core.Networking;
 using ABI_RC.Core.Player;
@@ -27,7 +28,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "2.0.2";
+        public const string Version = "2.0.3";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -304,16 +305,16 @@ namespace BTKSASelfPortrait
 
         private void GetHudElements()
         {
+            _hudContent = RootLogic.Instance.cohtmlHud.parent.GetComponentInChildren<Canvas>().gameObject;
+
             if (!MetaPort.Instance.isUsingVr)
             {
                 _cameraEye = PlayerSetup.Instance.desktopCamera;
-                _hudContent = PlayerSetup.Instance.desktopCamera.GetComponentInChildren<Canvas>().gameObject;
                 _lastVRCheck = false;
             }
             else
             {
                 _cameraEye = PlayerSetup.Instance.vrCamera;
-                _hudContent = PlayerSetup.Instance.vrCamera.GetComponentInChildren<Canvas>().gameObject;
                 _lastVRCheck = true;
             }
         }

@@ -34,8 +34,8 @@ using MelonLoader;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2.0.1.0")]
-[assembly: AssemblyFileVersion("2.0.1.0")]
+[assembly: AssemblyVersion("2.0.3.0")]
+[assembly: AssemblyFileVersion("2.0.3.0")]
 [assembly: MelonInfo(typeof(BTKSASelfPortrait.BTKSASelfPortrait), BTKSASelfPortrait.BuildInfo.Name, BTKSASelfPortrait.BuildInfo.Version, BTKSASelfPortrait.BuildInfo.Author, BTKSASelfPortrait.BuildInfo.DownloadLink)]
 [assembly: MelonGame("Alpha Blend Interactive", "ChilloutVR")]
 [assembly: MelonColor(255, 139,0,139)]
