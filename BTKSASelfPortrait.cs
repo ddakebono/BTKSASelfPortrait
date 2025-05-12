@@ -7,15 +7,13 @@ using UnityEngine;
 using System.IO;
 using ABI_RC.Core;
 using ABI_RC.Core.InteractionSystem;
-using ABI_RC.Core.Networking;
 using ABI_RC.Core.Player;
 using ABI_RC.Core.Savior;
+using ABI_RC.Systems.GameEventSystem;
 using BTKSASelfPortrait.Config;
 using BTKUILib;
 using BTKUILib.UIObjects;
 using BTKUILib.UIObjects.Components;
-using BTKUILib.UIObjects.Objects;
-using HarmonyLib;
 using Semver;
 using UnityEngine.UI;
 using UnityEngine.Rendering.PostProcessing;
@@ -28,7 +26,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono#0001";
         public const string Company = "BTK-Development";
-        public const string Version = "2.0.3";
+        public const string Version = "2.0.4";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
@@ -163,8 +161,7 @@ namespace BTKSASelfPortrait
                     _cameraComp.cullingMask &= ~(1 << LayerMask.NameToLayer("PlayerNetwork"));
             };
 
-            //Apply patches
-            ApplyPatches(typeof(RichPresensePatch));
+            CVRGameEventSystem.Instance.OnConnected.AddListener(ApplySPCameraAdjustments);
 
             LoadAssets();
 
@@ -176,8 +173,6 @@ namespace BTKSASelfPortrait
             if (_ranInitalize) return;
 
             _ranInitalize = true;
-            
-            RichPresensePatch.OnWorldJoin += ApplySPCameraAdjustments;
             
             GetHudElements();
             
@@ -230,7 +225,7 @@ namespace BTKSASelfPortrait
             }
         }
 
-        public void ApplySPCameraAdjustments(RichPresenceInstance_t richPresenceInstanceT)
+        public void ApplySPCameraAdjustments(string _)
         {
             if (_hasInstantiatedPrefabs)
             {
@@ -251,6 +246,7 @@ namespace BTKSASelfPortrait
                 _cameraComp.backgroundColor = bgColour;
                 _cameraComp.clearFlags = CameraClearFlags.SolidColor;
                 _cameraComp.farClipPlane = _farClippingDistance.FloatValue;
+                _cameraComp.depthTextureMode = DepthTextureMode.Depth;
                 if (_reflectOtherPlayers.BoolValue)
                     //Reflect other players
                     _cameraComp.cullingMask |= 1 << LayerMask.NameToLayer("PlayerNetwork");
@@ -395,44 +391,6 @@ namespace BTKSASelfPortrait
             }
 
             return true;
-        }
-    }
-
-    [HarmonyPatch(typeof(RichPresence))]
-    class RichPresensePatch
-    {
-        public static Action<RichPresenceInstance_t> OnWorldJoin;
-        
-        private static string _lastRichPresenseUpdate;
-        private static FieldInfo _richPresenceLastMsgGetter = typeof(RichPresence).GetField("LastMsg", BindingFlags.Static | BindingFlags.NonPublic);
-        
-        [HarmonyPatch(nameof(RichPresence.DisplayMode), MethodType.Setter)]
-        [HarmonyPrefix]
-        static bool OnRichPresenseUpdated()
-        {
-            var rpInfo = GetRichPresenceInfo();
-
-            if (rpInfo == null) return true;
-            
-            if (_lastRichPresenseUpdate == rpInfo.InstanceMeshId) return true;
-            
-            _lastRichPresenseUpdate = rpInfo.InstanceMeshId;
-
-            try
-            {
-                OnWorldJoin?.Invoke(rpInfo);
-            }
-            catch (Exception e)
-            {
-                BTKSASelfPortrait.Logger.Error(e);
-            }
-
-            return true;
-        }
-        
-        private static RichPresenceInstance_t GetRichPresenceInfo()
-        {
-            return _richPresenceLastMsgGetter.GetValue(null) as RichPresenceInstance_t;
         }
     }
 }
