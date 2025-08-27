@@ -26,7 +26,7 @@ namespace BTKSASelfPortrait
         public const string Name = "BTKSASelfPortrait";
         public const string Author = "DDAkebono";
         public const string Company = "BTK-Development";
-        public const string Version = "2.0.5";
+        public const string Version = "2.0.6";
         public const string DownloadLink = "https://github.com/ddakebono/BTKSASelfPortrait/releases";
     }
 
